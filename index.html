@@ -1,0 +1,129 @@
+<html>
+
+<head>
+  <meta charset="utf8">
+  <style>
+    body {
+      font: 100%/130% sans-serif;
+      margin: 0 auto;
+      max-width: 800px;
+      padding: 30px;
+    }
+
+    h2 {
+      margin-top: 50px;
+    }
+
+    pre {
+      margin-left: 20px;
+    }
+
+    pre.console {
+      color: #999;
+    }
+
+    pre.console span {
+      color: #000;
+      font-weight: bold;
+    }
+
+  </style>
+</head>
+
+<body>
+  <script src="out.js"></script>
+  <script src="out.min.js"></script>
+
+  <h1>Browser source map bugs</h1>
+  <p>This page documents some browser source map bugs we discovered. See <a
+      href="https://github.com/evanw/esbuild/issues/209">https://github.com/evanw/esbuild/issues/209</a> for more
+    context about this test.</p>
+
+  <h2>Test details</h2>
+  <p>This test contains two files bundled together. The first file is called <code>entry.ts</code> and looks like this:
+  </p>
+  <pre>import React from "react"
+import { render } from "react-dom"
+import { log } from "./other"
+const str = "esbuild"
+console.log('inside ' + new URL(document.currentScript.src).pathname)
+log(str)
+render(React.createElement("div"), document.body)
+</pre>
+  <p>The second file is called <code>other.ts</code> and looks like this:</p>
+  <pre>export function log(a: any) {
+  console.trace(a);
+}
+</pre>
+  <p>The test contains two bundles, one minified and one unminified. If the browser doesn't have source map bugs, the
+    unminified and minified calls to <code>console.trace()</code> should produce exactly the same stack trace in the
+    browser's developer tools.</p>
+
+  <h2>Running the test</h2>
+  <p>Open up your browser console. If your browser doesn't have source map bugs, you should see something like this:</p>
+  <pre class="console">
+inside /out.js
+esbuild
+    log         <span>other.ts:2</span>
+    (anonymous) <span>entry.ts:6</span>
+inside /out.min.js
+esbuild
+    Mf          <span>other.ts:2</span>
+    (anonymous) <span>entry.ts:6</span>
+</pre>
+
+  <h2 id="firefox">✅ Firefox 77.0.1</h2>
+  <p>Firefox can display the minified source map correctly:</p>
+  <pre class="console">
+inside /out.js
+console.trace() esbuild
+    log         <span>other.ts:2</span>
+    &lt;anonymous&gt; <span>entry.ts:6</span>
+    &lt;anonymous&gt; out.js:6758
+inside /out.min.js
+console.trace() esbuild
+    Mf          <span>other.ts:2</span> ✅
+    &lt;anonymous&gt; <span>entry.ts:6</span> ✅
+    &lt;anonymous&gt; entry.ts:7
+</pre>
+
+  <h2 id="safari">🚫 Safari 13.1.1</h2>
+  <p>Safari is buggy and can't display the minified source map correctly:</p>
+  <pre class="console">
+inside /out.js (out.js, line 6755)
+Trace: esbuild
+    log                  - <span>other.ts:2</span>
+    (anonymous function) - <span>entry.ts:6</span>
+    Global Code          - entry.ts:7
+inside /out.min.js (out.min.js, line 4)
+Trace: esbuild
+    Mf                   - <span>entry.ts:7</span> 🚫
+    (anonymous function) - <span>entry.ts:7</span> 🚫
+    Global Code          - entry.ts:7
+</pre>
+  <p>It's buggy because the source locations are incorrectly attributed to <code>entry.ts:7</code> instead of
+    <code>other.ts:2</code> and <code>entry.ts:6</code>.</p>
+
+  <h2 id="chrome">🚫 Chrome 83.0.4103.116</h2>
+  <p>Chrome is buggy and can't display the minified source map correctly:</p>
+  <pre class="console">
+inside /out.js
+esbuild
+    log         @ <span>other.ts:2</span>
+    (anonymous) @ <span>entry.ts:6</span>
+    (anonymous) @ entry.ts:7
+inside /out.min.js
+esbuild
+    Mf          @ <span>react-dom.production.min.js:244</span> 🚫
+    (anonymous) @ <span>react-dom.production.min.js:244</span> 🚫
+    (anonymous) @ react-dom.production.min.js:244
+  </pre>
+  <p>It's buggy because the source locations are incorrectly attributed to <code>react-dom.production.min.js</code>
+    instead of <code>other.ts</code> and <code>entry.ts</code>.</p>
+  <p>This bug happens because Chrome incorrectly uses a column offset of 0 instead of the real column offset to query
+    the source map. This bug was fixed in commit <a
+      href="https://github.com/ChromeDevTools/devtools-frontend/commit/a10679ba4c5862bac9bb3ca30d2172c94417eafa">a10679b</a>
+    and the issue no longer happens in the latest Chrome Canary.</p>
+</body>
+
+</html>
