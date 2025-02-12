@@ -3,7 +3,7 @@
     "build": "esbuild --bundle entry.ts --sourcemap --outfile=out.js --define:process.env.NODE_ENV='\"production\"' && esbuild --bundle entry.ts --sourcemap --outfile=out.min.js --define:process.env.NODE_ENV='\"production\"' --minify"
   },
   "dependencies": {
-    "esbuild": "0.5.16",
+    "esbuild": "0.25.0",
     "react": "16.13.1",
     "react-dom": "16.13.1",
     "source-map": "0.7.3"
